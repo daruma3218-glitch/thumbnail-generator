@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { designDirections } from '@/lib/directions';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   const anthropicKey = request.headers.get('x-anthropic-key');

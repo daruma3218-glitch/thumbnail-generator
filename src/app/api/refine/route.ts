@@ -3,7 +3,7 @@ import { runIterationDirector } from '@/lib/iteration-director';
 import { RefineRequest, RefinementResult } from '@/lib/types';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   const anthropicKey = request.headers.get('x-anthropic-key');
