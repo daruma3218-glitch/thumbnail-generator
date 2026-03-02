@@ -231,7 +231,15 @@ async function buildResult(
   promptVariation: PromptVariation,
 ): Promise<GeneratedThumbnail> {
   const thumbnailId = uuidv4();
-  const savePath = await saveThumbnailToFile(thumbnailId, imageResult.base64Data, imageResult.mimeType);
+
+  // ファイル保存はベストエフォート（Vercel等では書き込み不可なので失敗してもOK）
+  let savePath = '';
+  try {
+    savePath = await saveThumbnailToFile(thumbnailId, imageResult.base64Data, imageResult.mimeType);
+  } catch (err) {
+    console.warn(`[Gemini] File save skipped (serverless env): ${(err as Error).message}`);
+  }
+
   return {
     id: thumbnailId,
     promptVariation,
