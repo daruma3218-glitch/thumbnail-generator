@@ -6,17 +6,24 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
-  const geminiKey = request.headers.get('x-gemini-key');
-  if (!geminiKey) {
-    return NextResponse.json({ error: 'Gemini API key is required' }, { status: 401 });
-  }
-
-  const body = await request.json();
-
   try {
+    const geminiKey = request.headers.get('x-gemini-key');
+    if (!geminiKey) {
+      return NextResponse.json({ error: 'Gemini API key is required' }, { status: 401 });
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
     let thumbnails;
     let totalRequested: number;
     const geminiModel: GeminiModel = body.geminiModel || 'pro';
+
+    console.log(`[generate] mode=${body.editMode ? 'edit' : 'generate'}, model=${geminiModel}`);
 
     if (body.editMode && body.sourceImage && body.editInstructions) {
       // === 画像編集モード (Round 4+) ===
@@ -55,12 +62,16 @@ export async function POST(request: NextRequest) {
       localPath: t.localPath,
     }));
 
+    console.log(`[generate] success: ${thumbnails.length}/${totalRequested} images`);
+
     return NextResponse.json({
       thumbnails: thumbnailsForClient,
       totalRequested,
       totalGenerated: thumbnails.length,
     });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    const message = (err as Error).message || 'Unknown error';
+    console.error(`[generate] error: ${message}`);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

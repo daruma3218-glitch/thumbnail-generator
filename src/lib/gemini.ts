@@ -393,7 +393,14 @@ async function saveThumbnailToFile(
   mimeType: string
 ): Promise<string> {
   const ext = mimeType === 'image/png' ? 'png' : 'jpg';
-  const dir = path.join(process.cwd(), 'public', 'generated-thumbnails');
+
+  // Vercel等のサーバーレス環境では /tmp のみ書き込み可能
+  // ローカルでは public/ に保存
+  const isServerless = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME;
+  const dir = isServerless
+    ? path.join('/tmp', 'generated-thumbnails')
+    : path.join(process.cwd(), 'public', 'generated-thumbnails');
+
   await mkdir(dir, { recursive: true });
   const filePath = path.join(dir, `${id}.${ext}`);
   const buffer = Buffer.from(base64Data, 'base64');
