@@ -120,6 +120,8 @@ export type AppStep =
   | 'input'
   | 'extracting'
   | 'confirming_parts'
+  | 'recommending_type'
+  | 'selecting_type'
   | 'copywriting'
   | 'designing'
   | 'previewing'
@@ -140,6 +142,7 @@ export interface SavedSession {
   referenceImages: ReferenceImage[];
   iterations: IterationRound[];
   previewThumbnailDataUrl?: string;
+  selectedType?: string; // ThumbnailTypeId
 }
 
 export interface SessionListItem {

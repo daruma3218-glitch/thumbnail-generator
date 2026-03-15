@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { CLAUDE_MODEL } from './claude';
 import { CopywriterOutput } from './copywriter';
 import { ImageUsageType } from './types';
+import { ThumbnailTypeId, THUMBNAIL_TYPES } from './thumbnail-types';
 
 /**
  * ⑤ イテレーション・ディレクター
@@ -36,6 +37,8 @@ export interface IterationDirectorInput {
   previousFeedbacks?: string[];
   /** 画像編集モード（Round 4+）: editInstructionEn も出力する */
   editMode?: boolean;
+  /** 選択されたサムネイル型 */
+  selectedType?: ThumbnailTypeId;
 }
 
 export interface IterationDirectorOutput {
@@ -161,6 +164,17 @@ editInstructionEnのルール:
 - 各バリエーションで異なる編集を提案する
 - 例: "Edit this YouTube thumbnail: Increase all text overlays by 40%, make them bolder with thicker outlines. Slightly darken the background to improve text contrast."
 - promptEnも引き続き出力する（フォールバック用）`;
+  }
+
+  // 型制約の注入
+  if (input.selectedType) {
+    const ts = THUMBNAIL_TYPES[input.selectedType];
+    systemPrompt += `\n\n## 選択されたサムネイル型: ${ts.name}（必ず維持すること）
+改善バリエーションでも、この型の基本ルールは維持すること。型自体を変更してはならない。
+
+[COMPOSITION] 制約: ${ts.promptConstraints.compositionEn}
+[COLOR SCHEME] 制約: ${ts.promptConstraints.colorSchemeEn}
+[TEXT PLACEMENT] 制約: ${ts.promptConstraints.textPlacementEn}`;
   }
 
   if (input.hasReferenceImages) {

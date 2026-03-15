@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { runIterationDirector } from '@/lib/iteration-director';
 import { RefineRequest, RefinementResult } from '@/lib/types';
+import { ThumbnailTypeId } from '@/lib/thumbnail-types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
         hasReferenceImages: body.hasReferenceImages || false,
         imageUsageTypes: body.imageUsageTypes,
         previousFeedbacks: body.previousFeedbacks,
+        selectedType: (body as unknown as Record<string, unknown>).selectedType as ThumbnailTypeId | undefined,
       },
       anthropicKey,
     );

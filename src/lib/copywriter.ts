@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { CLAUDE_MODEL } from './claude';
 import { ExtractedParts } from './types';
+import { ThumbnailTypeId, THUMBNAIL_TYPES } from './thumbnail-types';
 
 /**
  * ③ コピーライター・エージェント
@@ -60,8 +61,19 @@ export async function generateCopy(
   title: string,
   parts: ExtractedParts,
   anthropicKey: string,
+  selectedType?: ThumbnailTypeId,
 ): Promise<CopywriterOutput> {
   const client = new Anthropic({ apiKey: anthropicKey });
+
+  let systemPrompt = COPYWRITER_PROMPT;
+  if (selectedType) {
+    const typeSpec = THUMBNAIL_TYPES[selectedType];
+    systemPrompt += `\n\n## 選択されたサムネイル型: ${typeSpec.name}（コピーを型に合わせること）
+- テキスト階層: ${typeSpec.fontRules.hierarchy}
+- 構造: ${typeSpec.structure.sections.join(' → ')}
+- フォーカルポイント: ${typeSpec.structure.focalPoint}
+- この型に必要なコピーパターンを最優先で生成すること`;
+  }
 
   const userMessage = `以下の動画分析データを元に、サムネイル用のキャッチコピーを設計してください。
 
@@ -87,7 +99,7 @@ JSONのみを出力してください。`;
   const response = await client.messages.create({
     model: CLAUDE_MODEL,
     max_tokens: 1024,
-    system: COPYWRITER_PROMPT,
+    system: systemPrompt,
     messages: [{ role: 'user', content: userMessage }],
   });
 

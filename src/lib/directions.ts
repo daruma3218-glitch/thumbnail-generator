@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { CLAUDE_MODEL } from './claude';
 import { CopywriterOutput } from './copywriter';
 import { CreativeDirection, DirectionsResult, ImageUsageType, RefinementDirection, RefinementResult } from './types';
+import { ThumbnailTypeId, THUMBNAIL_TYPES } from './thumbnail-types';
 
 const MAX_SEARCH_CONTINUATIONS = 3;
 
@@ -256,10 +257,28 @@ export async function designDirections(
   hasReferenceImages?: boolean,
   copywriterOutput?: CopywriterOutput,
   imageUsageTypes?: ImageUsageType[],
+  selectedType?: ThumbnailTypeId,
 ): Promise<DirectionsResult> {
   const client = new Anthropic({ apiKey: anthropicKey });
 
   let systemPrompt = DIRECTIONS_SYSTEM_PROMPT;
+
+  // 型制約の注入
+  if (selectedType) {
+    const ts = THUMBNAIL_TYPES[selectedType];
+    systemPrompt += `\n\n## 選択されたサムネイル型: ${ts.name}（全方向性でこの型ルールに厳密に従うこと）
+
+心理的アプローチは3方向で変えてよいが、構図・配色・テキスト配置のルールはこの型に固定すること。
+
+### [COMPOSITION] の制約:
+${ts.promptConstraints.compositionEn}
+
+### [COLOR SCHEME] の制約:
+${ts.promptConstraints.colorSchemeEn}
+
+### [TEXT PLACEMENT] の制約:
+${ts.promptConstraints.textPlacementEn}`;
+  }
   if (stylePrinciples && stylePrinciples.trim()) {
     systemPrompt += `\n\n## スタイル基本原則（必ず全方向性に適用すること）\n${stylePrinciples}`;
   }

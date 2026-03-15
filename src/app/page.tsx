@@ -8,7 +8,10 @@ import { PartsEditor } from '@/components/PartsEditor';
 import { ThumbnailGrid } from '@/components/ThumbnailGrid';
 import { IterationHistory } from '@/components/IterationHistory';
 import { SessionHistory } from '@/components/SessionHistory';
-import { GeneratingLoader, DesigningLoader, ExtractingLoader, CopywritingLoader, ErrorBanner } from '@/components/LoadingStates';
+import { GeneratingLoader, DesigningLoader, ExtractingLoader, CopywritingLoader, RecommendingTypeLoader, ErrorBanner } from '@/components/LoadingStates';
+import { TypeSelector } from '@/components/TypeSelector';
+import { ThumbnailTypeId } from '@/lib/thumbnail-types';
+import { TypeRecommendation } from '@/lib/type-recommender';
 import { useGeneration } from '@/hooks/useGeneration';
 import { usePartsExtraction } from '@/hooks/usePartsExtraction';
 import { useSessionHistory } from '@/hooks/useSessionHistory';
@@ -192,6 +195,10 @@ export default function HomePage() {
   // Gemini model selection
   const [geminiModel, setGeminiModel] = useState<GeminiModel>('flash');
 
+  // 型選択
+  const [typeRecommendation, setTypeRecommendation] = useState<TypeRecommendation | null>(null);
+  const [selectedType, setSelectedType] = useState<ThumbnailTypeId | null>(null);
+
   // ⑤ Feedback history for iteration director
   const [feedbackHistory, setFeedbackHistory] = useState<string[]>([]);
 
@@ -226,11 +233,12 @@ export default function HomePage() {
         extractedParts: partsExtraction.extractedParts || null,
         referenceImages,
         iterations: updatedIterations,
+        selectedType: selectedType || undefined,
       };
 
       sessionHistory.save(session);
     },
-    [title, script, originalConcept, referenceImages, partsExtraction.extractedParts, sessionHistory],
+    [title, script, originalConcept, referenceImages, partsExtraction.extractedParts, sessionHistory, selectedType],
   );
 
   // Handle loading a session from history
@@ -251,6 +259,8 @@ export default function HomePage() {
       setDesignError(null);
       setCopywriterOutput(null);
       setFeedbackHistory([]);
+      setTypeRecommendation(null);
+      setSelectedType((session.selectedType as ThumbnailTypeId) || null);
       sessionIdRef.current = session.id;
 
       if (session.iterations && session.iterations.length > 0) {
@@ -298,6 +308,8 @@ export default function HomePage() {
       setDesignError(null);
       setCopywriterOutput(null);
       setFeedbackHistory([]);
+      setTypeRecommendation(null);
+      setSelectedType(null);
       generation.resetGeneration();
       partsExtraction.reset();
 
@@ -329,17 +341,12 @@ export default function HomePage() {
     }
   }, [apiKeys, title, script, partsExtraction]);
 
-  // Step 3: CASCADE PIPELINE
-  // User confirms parts → ③ Copywriter → ④ Prompt Engineer (directions)
-  const handlePartsConfirmed = useCallback(
-    async (editedParts: ExtractedParts) => {
+  // カスケードパイプライン: コピーライター → 方向性設計
+  const runCascadePipeline = useCallback(
+    async (concept: string) => {
       if (!apiKeys) return;
 
-      const concept = buildConceptFromParts(title, editedParts);
-      setOriginalConcept(concept);
-      setDesignError(null);
-
-      // Step 3a: ③ コピーライター
+      // ③ コピーライター
       setStep('copywriting');
       let copyOutput: CopywriterOutput | null = null;
       try {
@@ -349,7 +356,7 @@ export default function HomePage() {
             'Content-Type': 'application/json',
             'x-anthropic-key': apiKeys.anthropicKey,
           },
-          body: JSON.stringify({ title, parts: editedParts }),
+          body: JSON.stringify({ title, parts: partsExtraction.extractedParts, selectedType: selectedType || undefined }),
         });
 
         if (copyResponse.ok) {
@@ -362,7 +369,7 @@ export default function HomePage() {
         console.warn('[cascade] Copywriter error:', (err as Error).message);
       }
 
-      // Step 3b: ④ プロンプト・エンジニア（方向性設計）
+      // ④ プロンプト・エンジニア（方向性設計）
       setStep('designing');
       const usageTypes = referenceImages.length > 0
         ? referenceImages.map(img => img.usage)
@@ -380,6 +387,7 @@ export default function HomePage() {
             hasReferenceImages: referenceImages.length > 0,
             copywriterOutput: copyOutput,
             imageUsageTypes: usageTypes,
+            selectedType: selectedType || undefined,
           }),
         });
 
@@ -396,7 +404,51 @@ export default function HomePage() {
         setStep('confirming_parts');
       }
     },
-    [apiKeys, title, referenceImages],
+    [apiKeys, title, referenceImages, selectedType, partsExtraction.extractedParts],
+  );
+
+  // 型選択確定ハンドラ
+  const handleTypeConfirmed = useCallback(async () => {
+    await runCascadePipeline(originalConcept);
+  }, [runCascadePipeline, originalConcept]);
+
+  // Step 3: パーツ確定 → 型推薦
+  const handlePartsConfirmed = useCallback(
+    async (editedParts: ExtractedParts) => {
+      if (!apiKeys) return;
+
+      const concept = buildConceptFromParts(title, editedParts);
+      setOriginalConcept(concept);
+      setDesignError(null);
+
+      // 型推薦を実行
+      setStep('recommending_type');
+      try {
+        const response = await fetch('/api/recommend-type', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-anthropic-key': apiKeys.anthropicKey,
+          },
+          body: JSON.stringify({ title, parts: editedParts }),
+        });
+
+        if (response.ok) {
+          const recommendation: TypeRecommendation = await response.json();
+          setTypeRecommendation(recommendation);
+          setSelectedType(recommendation.recommendedType);
+          setStep('selecting_type');
+        } else {
+          // 型推薦失敗時はスキップしてコピーライティングへ
+          console.warn('[cascade] Type recommendation failed, skipping');
+          await runCascadePipeline(concept);
+        }
+      } catch (err) {
+        console.warn('[cascade] Type recommender error:', (err as Error).message);
+        await runCascadePipeline(concept);
+      }
+    },
+    [apiKeys, title, runCascadePipeline],
   );
 
   // Step 4: Generate from directions preview
@@ -626,6 +678,7 @@ export default function HomePage() {
               imageUsageTypes: refUsageTypes,
               copywriterOutput: currentCopyOutput,
               previousFeedbacks: trimmedHistory.length > 0 ? trimmedHistory : undefined,
+              selectedType: selectedType || undefined,
             }),
           });
 
@@ -657,7 +710,7 @@ export default function HomePage() {
       setDesignError(friendlyMessage);
       setStep('selecting');
     },
-    [selectedThumbnail, originalConcept, apiKeys, feedbackHistory, copywriterOutput, referenceImages, iterations, generation, autoSaveSession, geminiModel],
+    [selectedThumbnail, originalConcept, apiKeys, feedbackHistory, copywriterOutput, referenceImages, iterations, generation, autoSaveSession, geminiModel, selectedType],
   );
 
   // Start over
@@ -675,6 +728,8 @@ export default function HomePage() {
     setDesignError(null);
     setCopywriterOutput(null);
     setFeedbackHistory([]);
+    setTypeRecommendation(null);
+    setSelectedType(null);
     sessionIdRef.current = null;
     sessionHistory.setCurrentSessionId(null);
     generation.resetGeneration();
@@ -741,10 +796,12 @@ export default function HomePage() {
       </div>
 
       {/* Pipeline Status (show active agents + mode indicator) */}
-      {(step === 'copywriting' || step === 'designing' || step === 'refining') && (
+      {(step === 'recommending_type' || step === 'selecting_type' || step === 'copywriting' || step === 'designing' || step === 'refining') && (
         <div className="max-w-4xl mx-auto mb-4">
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <span className="text-gray-600">② 分析</span>
+            <span className="text-gray-700">→</span>
+            <span className={step === 'recommending_type' || step === 'selecting_type' ? 'text-cyan-400' : 'text-gray-600'}>型選択</span>
             <span className="text-gray-700">→</span>
             <span className={step === 'copywriting' ? 'text-pink-400' : 'text-gray-600'}>③ コピー</span>
             <span className="text-gray-700">→</span>
@@ -798,6 +855,22 @@ export default function HomePage() {
           <ErrorBanner
             message={partsExtraction.extractionError || 'パーツ抽出中にエラーが発生しました'}
             onRetry={handleReExtract}
+          />
+        )}
+
+        {/* Step: Recommending type */}
+        {step === 'recommending_type' && (
+          <RecommendingTypeLoader />
+        )}
+
+        {/* Step: Selecting type */}
+        {step === 'selecting_type' && typeRecommendation && selectedType && (
+          <TypeSelector
+            recommendation={typeRecommendation}
+            selectedType={selectedType}
+            onTypeSelect={setSelectedType}
+            onConfirm={handleTypeConfirmed}
+            onBack={() => setStep('confirming_parts')}
           />
         )}
 

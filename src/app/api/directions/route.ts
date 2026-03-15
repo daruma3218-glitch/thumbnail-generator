@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       reasoning: string;
     };
     imageUsageTypes?: string[];
+    selectedType?: string;
   };
   try {
     body = await request.json();
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
       body.hasReferenceImages,
       body.copywriterOutput,
       body.imageUsageTypes as import('@/lib/types').ImageUsageType[] | undefined,
+      body.selectedType as import('@/lib/thumbnail-types').ThumbnailTypeId | undefined,
     );
     return new Response(JSON.stringify(result), {
       headers: { 'Content-Type': 'application/json' },

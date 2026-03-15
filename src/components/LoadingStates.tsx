@@ -92,6 +92,25 @@ export function ExtractingLoader() {
   );
 }
 
+export function RecommendingTypeLoader() {
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+        <div className="inline-flex items-center gap-3 mb-4">
+          <div className="flex gap-1">
+            <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+          </div>
+        </div>
+        <p className="text-gray-300 font-medium">最適なサムネイル型を分析中...</p>
+        <p className="text-gray-500 text-sm mt-2">
+          原稿の内容に最適なサムネイルテンプレートを推薦しています。
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function ErrorBanner({
   message,
   onRetry,
