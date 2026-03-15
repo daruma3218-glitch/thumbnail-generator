@@ -45,25 +45,29 @@ const SAFETY_SETTINGS = [
 // Technical quality suffix appended to every Gemini generation prompt
 const QUALITY_SUFFIX = `
 
-CRITICAL REQUIREMENTS:
-- All text overlays MUST be in Japanese (日本語). Never use English text on the thumbnail.
-- Text must be large, bold, with thick black outlines for readability at small sizes.
-- Use high-contrast, saturated colors. Avoid muted or pastel colors.
+CRITICAL REQUIREMENTS (per section):
+
+[COMPOSITION] rules:
 - Keep composition bold and simple. One clear focal point.
+- Use dynamic angles and asymmetry. No centered-and-boring layouts.
 - Photorealistic, professional YouTube thumbnail quality. High detail, sharp focus.
+- No cluttered compositions with too many elements.
+- No cheap CGI or 3D-rendered look. No plastic skin textures.
+- No stock photo aesthetic. No generic corporate feel.
+- No anime/cartoon style unless explicitly requested.
 - 16:9 aspect ratio.
 
-NEGATIVE PROMPT (AVOID these at all costs):
-- No cheap CGI or 3D-rendered look. No plastic skin textures.
-- No blurry, illegible, or overlapping text. No English text.
-- No cluttered compositions with too many elements.
-- No stock photo aesthetic. No generic corporate feel.
+[COLOR SCHEME] rules:
+- Use high-contrast, saturated colors. Avoid muted or pastel colors.
 - No washed-out, low-contrast, or pastel color palettes.
-- No watermarks, borders, or frames.
-- No small, thin, or hard-to-read fonts.
 - No artificial-looking lighting or flat shadows.
-- No anime/cartoon style unless explicitly requested.
-- No centered-and-boring layouts. Use dynamic angles and asymmetry.`;
+- No watermarks, borders, or frames.
+
+[TEXT PLACEMENT] rules:
+- All text overlays MUST be in Japanese (日本語). Never use English text on the thumbnail.
+- Text must be large, bold, with thick black outlines for readability at small sizes.
+- No blurry, illegible, or overlapping text. No English text.
+- No small, thin, or hard-to-read fonts.`;
 
 // Lightweight quality suffix for image editing (preserve the original, only change what's asked)
 const EDIT_QUALITY_SUFFIX = `

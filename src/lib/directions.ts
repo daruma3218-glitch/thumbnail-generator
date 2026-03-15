@@ -23,15 +23,45 @@ const DIRECTIONS_SYSTEM_PROMPT = `あなたはYouTubeサムネイルのトップ
    - 権威・信頼（専門性・実績・社会的証明で信頼を得る）
    - 対比・ギャップ（ビフォーアフター・常識との矛盾で注目を集める）
 3. 各方向性は同じ動画でも**全く違う見え方**になるようにする
-4. promptEnは**Geminiの画像生成用プロンプト**。クリエイティブの核心を具体的に書くこと:
-   - 「Generate a YouTube thumbnail image for a Japanese audience」で始める
-   - 具体的な構図（人物配置、背景、アングル）を映画のワンシーンのように描写する
-   - 色彩・ライティング・ムードを具体的に指示する
-   - **サムネイル上のテキストは必ず日本語**で書く。例: text overlay reading "衝撃の真実" in bold yellow with thick black outline
-   - テキストは短く（日本語3〜5語以内）。太い縁取り必須
-   - 人物がいる場合は感情表現を誇張する（例: eyes wide open, mouth agape in shock）
-   - 大胆でシンプルな構図。要素を絞って1つの焦点に集中する
-   - プロンプトは創造的かつ具体的に。テンプレート的・無難な表現を避ける
+4. promptEnは**Geminiの画像生成用プロンプト**。以下の3セクション構造で書くこと:
+
+### promptEnの必須フォーマット（厳守）
+「Generate a YouTube thumbnail image for a Japanese audience.」で始め、以下の3セクションで構成する:
+
+**[COMPOSITION]** — 構図・レイアウト
+- 人物/被写体の配置（左寄せ、中央、右寄せ、サイズ感）
+- カメラアングル（クローズアップ、ミディアム、ワイド）
+- 前景と背景の関係性
+- 人物がいる場合は感情表現を誇張する（例: eyes wide open, mouth agape in shock）
+- 大胆でシンプル。要素を絞って1つの焦点に集中
+
+**[COLOR SCHEME]** — 配色・ライティング
+- メインカラーとアクセントカラー（具体的な色名）
+- ライティングの方向と質感（dramatic side lighting、soft diffused light等）
+- グラデーション・コントラストの強さ
+- 全体のムード（cinematic、energetic、mysterious等）
+
+**[TEXT PLACEMENT]** — 文字配置
+- テキスト内容は**必ず日本語**（3〜5語以内）
+- フォントスタイル（bold, extra-bold等）と太い黒縁取り必須
+- 配置位置（top-right、center-left、bottom等）
+- サイズ感（dominant、medium、subtle）
+
+例:
+---
+Generate a YouTube thumbnail image for a Japanese audience.
+
+[COMPOSITION]
+Close-up of a young entrepreneur positioned slightly left, eyes wide open in shock, mouth agape. Clean negative space on the right side. Simple blurred office background.
+
+[COLOR SCHEME]
+Electric blue to orange gradient background. High-contrast, saturated colors. Dramatic side lighting with sharp shadows on face. Yellow accent lightning bolts.
+
+[TEXT PLACEMENT]
+Text overlay reading "衝撃の真実" in extra-bold white font with thick black outline, positioned top-right, dominating 30% of the thumbnail area.
+---
+
+- テンプレート的・無難な表現を避け、創造的かつ具体的に書くこと
 
 ## Web検索の活用
 - 必要に応じてWeb検索で同ジャンルの人気サムネイル傾向を調査し、差別化に活かす
@@ -62,13 +92,13 @@ const REFINEMENT_SYSTEM_PROMPT = `あなたはYouTubeサムネイルのトップ
    - 色彩・ムード変更（配色、明暗、雰囲気、感情トーンの改善）
 2. 全てのバリエーションにユーザーのフィードバックを反映すること
 3. 元の方向性の良い部分は維持しつつ、各軸で大胆に改善すること
-4. promptEnは**Geminiの画像生成用プロンプト**。クリエイティブの核心を具体的に書く:
+4. promptEnは**Geminiの画像生成用プロンプト**。以下の3セクション構造で書くこと:
    - 「Generate a YouTube thumbnail image for a Japanese audience」で始める
-   - 具体的な構図・色彩・ライティングを映画的に描写する
-   - **テキストは必ず日本語**。太い縁取り必須。3〜5語以内
-   - 人物がいる場合は感情表現を誇張する
-   - 大胆でシンプル。要素を絞り1つの焦点に集中
-   - プロンプトは創造的に。テンプレート的な表現を避ける
+   - **[COMPOSITION]**: 構図・人物配置・アングル・レイアウトの改善を記述
+   - **[COLOR SCHEME]**: 配色・ライティング・ムード・コントラストの改善を記述
+   - **[TEXT PLACEMENT]**: 日本語テキスト内容（3〜5語）・フォント・配置位置・サイズ・縁取りを記述
+   - 各セクションの改善軸に該当する部分を特に詳しく書くこと
+   - テンプレート的な表現を避け、創造的かつ具体的に
 
 ## 出力形式（JSON厳密出力。JSON以外は出力しないこと）
 {
