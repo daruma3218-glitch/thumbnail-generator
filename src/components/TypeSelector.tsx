@@ -5,7 +5,7 @@ import { TypeRecommendation } from '@/lib/type-recommender';
 
 interface TypeSelectorProps {
   recommendation: TypeRecommendation;
-  selectedType: ThumbnailTypeId;
+  selectedTypes: ThumbnailTypeId[];
   onTypeSelect: (typeId: ThumbnailTypeId) => void;
   onConfirm: () => void;
   onBack: () => void;
@@ -54,24 +54,27 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 
+const SELECTION_BADGES = ['❶', '❷', '❸'];
+
 export function TypeSelector({
   recommendation,
-  selectedType,
+  selectedTypes,
   onTypeSelect,
   onConfirm,
   onBack,
 }: TypeSelectorProps) {
-  // Sort: recommended first, then by score descending
+  // Sort: by score descending
   const sortedTypes = [...THUMBNAIL_TYPE_LIST].sort((a, b) => {
-    if (a.id === recommendation.recommendedType) return -1;
-    if (b.id === recommendation.recommendedType) return 1;
     const scoreA = recommendation.rankings.find(r => r.typeId === a.id)?.score ?? 0;
     const scoreB = recommendation.rankings.find(r => r.typeId === b.id)?.score ?? 0;
     return scoreB - scoreA;
   });
 
-  const selectedSpec = THUMBNAIL_TYPES[selectedType];
-  const selectedRanking = recommendation.rankings.find(r => r.typeId === selectedType);
+  // Top 3 from rankings
+  const top3TypeIds = [...recommendation.rankings]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(r => r.typeId);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -80,7 +83,15 @@ export function TypeSelector({
         <div className="flex items-start gap-3">
           <span className="text-2xl">🤖</span>
           <div>
-            <h3 className="text-cyan-300 font-bold text-lg">AI推薦: {THUMBNAIL_TYPES[recommendation.recommendedType].name}</h3>
+            <h3 className="text-cyan-300 font-bold text-lg">
+              AI推薦 TOP3:{' '}
+              {top3TypeIds.map((typeId, i) => (
+                <span key={typeId}>
+                  {i > 0 && '、'}
+                  {THUMBNAIL_TYPES[typeId].name}
+                </span>
+              ))}
+            </h3>
             <p className="text-cyan-200/70 text-sm mt-1">{recommendation.reasoning}</p>
           </div>
         </div>
@@ -88,30 +99,45 @@ export function TypeSelector({
 
       {/* Type Grid */}
       <div>
-        <h3 className="text-gray-400 text-sm font-medium mb-3">サムネイル型を選択してください</h3>
+        <h3 className="text-gray-400 text-sm font-medium mb-3">
+          サムネイル型を3つ選択してください
+          <span className="ml-2 text-cyan-400 font-bold">({selectedTypes.length}/3)</span>
+        </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {sortedTypes.map((type) => {
             const ranking = recommendation.rankings.find(r => r.typeId === type.id);
-            const isSelected = type.id === selectedType;
-            const isRecommended = type.id === recommendation.recommendedType;
+            const selectionIndex = selectedTypes.indexOf(type.id);
+            const isSelected = selectionIndex !== -1;
+            const isTopRecommended = top3TypeIds.includes(type.id);
             const colors = TYPE_COLORS[type.id];
+            const isFull = selectedTypes.length >= 3;
 
             return (
               <button
                 key={type.id}
                 onClick={() => onTypeSelect(type.id)}
+                disabled={!isSelected && isFull}
                 className={`
                   relative text-left p-4 rounded-xl border-2 transition-all duration-200
                   bg-gradient-to-b ${colors.bg}
                   ${isSelected
                     ? `${colors.border} ring-2 ring-offset-1 ring-offset-gray-950 ring-white/20 scale-[1.02]`
-                    : 'border-gray-800 hover:border-gray-600 hover:scale-[1.01]'
+                    : isFull
+                      ? 'border-gray-800 opacity-40 cursor-not-allowed'
+                      : 'border-gray-800 hover:border-gray-600 hover:scale-[1.01]'
                   }
                 `}
               >
+                {/* Selection order badge */}
+                {isSelected && (
+                  <span className="absolute top-2 right-2 w-7 h-7 rounded-full bg-cyan-500 text-white text-sm font-bold flex items-center justify-center shadow-lg">
+                    {SELECTION_BADGES[selectionIndex]}
+                  </span>
+                )}
+
                 {/* Badges */}
                 <div className="flex items-center gap-1.5 mb-2">
-                  {isRecommended && (
+                  {isTopRecommended && (
                     <span className="text-[10px] px-1.5 py-0.5 bg-cyan-500/20 text-cyan-300 rounded-full font-bold">
                       推薦
                     </span>
@@ -140,65 +166,70 @@ export function TypeSelector({
         </div>
       </div>
 
-      {/* Selected Type Detail */}
-      {selectedSpec && (
-        <div className={`bg-gradient-to-b ${TYPE_COLORS[selectedType].bg} border ${TYPE_COLORS[selectedType].border} rounded-xl p-5`}>
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-3xl">{TYPE_ICONS[selectedType]}</span>
-            <div>
-              <h3 className="text-white font-bold text-lg">{selectedSpec.name}</h3>
-              <p className="text-gray-400 text-sm">{selectedSpec.shortDescription}</p>
-            </div>
-          </div>
+      {/* Selected Types Detail (3-column layout) */}
+      {selectedTypes.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {selectedTypes.map((typeId, index) => {
+            const spec = THUMBNAIL_TYPES[typeId];
+            const colors = TYPE_COLORS[typeId];
+            const ranking = recommendation.rankings.find(r => r.typeId === typeId);
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            {/* Structure */}
-            <div className="bg-black/30 rounded-lg p-3">
-              <h4 className="text-gray-300 font-bold mb-2">📐 構造</h4>
-              <p className="text-gray-400 text-xs leading-relaxed">{selectedSpec.structure.layout}</p>
-              <div className="mt-2 space-y-1">
-                {selectedSpec.structure.sections.map((s, i) => (
-                  <div key={i} className="text-[11px] text-gray-500">• {s}</div>
-                ))}
+            return (
+              <div key={typeId} className={`bg-gradient-to-b ${colors.bg} border ${colors.border} rounded-xl p-4`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-6 h-6 rounded-full bg-cyan-500 text-white text-xs font-bold flex items-center justify-center">
+                    {SELECTION_BADGES[index]}
+                  </span>
+                  <span className="text-lg">{TYPE_ICONS[typeId]}</span>
+                  <span className="text-white font-bold text-sm">{spec.name}</span>
+                </div>
+
+                <p className="text-[11px] text-gray-400 mb-3">{spec.shortDescription}</p>
+
+                {/* Compact spec */}
+                <div className="space-y-2 text-[11px]">
+                  <div>
+                    <span className="text-gray-500">構図:</span>
+                    <span className="text-gray-400 ml-1">{spec.structure.layout}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">配色:</span>
+                    <span className="text-gray-400 ml-1">{spec.colorRules.mood}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">テキスト:</span>
+                    <span className="text-gray-400 ml-1">{spec.layoutRules.textPlacement}</span>
+                  </div>
+                </div>
+
+                {/* Suitable For */}
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {spec.suitableFor.slice(0, 3).map((s, i) => (
+                    <span key={i} className={`text-[9px] px-1.5 py-0.5 rounded-full ${colors.badge}`}>
+                      {s}
+                    </span>
+                  ))}
+                </div>
+
+                {/* AI reasoning */}
+                {ranking && (
+                  <div className="mt-2 text-[10px] text-gray-500 italic line-clamp-2">
+                    {ranking.reasoning}
+                  </div>
+                )}
               </div>
-            </div>
+            );
+          })}
 
-            {/* Colors */}
-            <div className="bg-black/30 rounded-lg p-3">
-              <h4 className="text-gray-300 font-bold mb-2">🎨 配色</h4>
-              <div className="space-y-1 text-[11px] text-gray-400">
-                <div>背景: {selectedSpec.colorRules.background}</div>
-                <div>アクセント: {selectedSpec.colorRules.accent}</div>
-                <div>テキスト: {selectedSpec.colorRules.textColor}</div>
-                <div>ムード: {selectedSpec.colorRules.mood}</div>
-              </div>
+          {/* Empty slots */}
+          {Array.from({ length: 3 - selectedTypes.length }).map((_, i) => (
+            <div
+              key={`empty-${i}`}
+              className="border-2 border-dashed border-gray-700 rounded-xl p-4 flex items-center justify-center min-h-[160px]"
+            >
+              <span className="text-gray-600 text-sm">型を選択してください</span>
             </div>
-
-            {/* Layout */}
-            <div className="bg-black/30 rounded-lg p-3">
-              <h4 className="text-gray-300 font-bold mb-2">📏 レイアウト</h4>
-              <div className="space-y-1 text-[11px] text-gray-400">
-                <div>{selectedSpec.layoutRules.composition}</div>
-                <div>テキスト: {selectedSpec.layoutRules.textPlacement}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Suitable For */}
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {selectedSpec.suitableFor.map((s, i) => (
-              <span key={i} className={`text-[10px] px-2 py-0.5 rounded-full ${TYPE_COLORS[selectedType].badge}`}>
-                {s}
-              </span>
-            ))}
-          </div>
-
-          {/* AI reasoning for this type */}
-          {selectedRanking && (
-            <div className="mt-3 text-xs text-gray-500 italic">
-              💡 {selectedRanking.reasoning}
-            </div>
-          )}
+          ))}
         </div>
       )}
 
@@ -212,9 +243,14 @@ export function TypeSelector({
         </button>
         <button
           onClick={onConfirm}
-          className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-bold transition-colors"
+          disabled={selectedTypes.length !== 3}
+          className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+            selectedTypes.length === 3
+              ? 'bg-cyan-600 hover:bg-cyan-500 text-white'
+              : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+          }`}
         >
-          この型でサムネイルを生成する →
+          この3型でサムネイルを生成する →
         </button>
       </div>
     </div>

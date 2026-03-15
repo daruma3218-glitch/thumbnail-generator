@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  let body: { title?: string; parts?: ExtractedParts; selectedType?: string };
+  let body: { title?: string; parts?: ExtractedParts; selectedTypes?: string[]; selectedType?: string };
   try {
     body = await request.json();
   } catch {
@@ -32,7 +32,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await generateCopy(body.title, body.parts, anthropicKey, body.selectedType as import('@/lib/thumbnail-types').ThumbnailTypeId | undefined);
+    // selectedTypes優先、後方互換でselectedTypeもサポート
+    const selectedTypes = body.selectedTypes || (body.selectedType ? [body.selectedType] : undefined);
+    const result = await generateCopy(body.title, body.parts, anthropicKey, selectedTypes as import('@/lib/thumbnail-types').ThumbnailTypeId[] | undefined);
     return new Response(JSON.stringify(result), {
       headers: { 'Content-Type': 'application/json' },
     });

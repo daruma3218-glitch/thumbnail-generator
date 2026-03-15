@@ -73,6 +73,7 @@ Text overlay reading "衝撃の真実" in extra-bold white font with thick black
   "directions": [
     {
       "id": "dir-1",
+      "typeId": "T01",
       "approach": "心理的アプローチ名",
       "psychologicalAngle": "このアプローチの詳細説明",
       "conceptSummary": "日本語でのサムネイル方向性サマリー",
@@ -257,27 +258,38 @@ export async function designDirections(
   hasReferenceImages?: boolean,
   copywriterOutput?: CopywriterOutput,
   imageUsageTypes?: ImageUsageType[],
-  selectedType?: ThumbnailTypeId,
+  selectedTypes?: ThumbnailTypeId[],
 ): Promise<DirectionsResult> {
   const client = new Anthropic({ apiKey: anthropicKey });
 
   let systemPrompt = DIRECTIONS_SYSTEM_PROMPT;
 
-  // 型制約の注入
-  if (selectedType) {
-    const ts = THUMBNAIL_TYPES[selectedType];
-    systemPrompt += `\n\n## 選択されたサムネイル型: ${ts.name}（全方向性でこの型ルールに厳密に従うこと）
+  // 型制約の注入（3型 → 各方向性に異なる型を割り当て）
+  if (selectedTypes && selectedTypes.length > 0) {
+    const typeConstraints = selectedTypes.map((typeId, index) => {
+      const ts = THUMBNAIL_TYPES[typeId];
+      return `### 方向性${index + 1} → ${ts.name}（${typeId}）
+この方向性は「${ts.name}」の型ルールに厳密に従うこと。
+出力JSONで "typeId": "${typeId}" を必ず含めること。
 
-心理的アプローチは3方向で変えてよいが、構図・配色・テキスト配置のルールはこの型に固定すること。
-
-### [COMPOSITION] の制約:
+[COMPOSITION] 制約:
 ${ts.promptConstraints.compositionEn}
 
-### [COLOR SCHEME] の制約:
+[COLOR SCHEME] 制約:
 ${ts.promptConstraints.colorSchemeEn}
 
-### [TEXT PLACEMENT] の制約:
+[TEXT PLACEMENT] 制約:
 ${ts.promptConstraints.textPlacementEn}`;
+    });
+
+    systemPrompt += `\n\n## ${selectedTypes.length}つのサムネイル型が選択されています（各方向性で異なる型を使用すること）
+
+重要: ${selectedTypes.length}つの方向性はそれぞれ**異なる型**のルールに従います。
+方向性1は型1のルール、方向性2は型2のルール、方向性3は型3のルールに従うこと。
+心理的アプローチの選択は自由だが、構図・配色・テキスト配置は各方向性に指定された型に固定すること。
+各directionの出力JSONに "typeId": "T0X" フィールドを必ず含めること。
+
+${typeConstraints.join('\n\n')}`;
   }
   if (stylePrinciples && stylePrinciples.trim()) {
     systemPrompt += `\n\n## スタイル基本原則（必ず全方向性に適用すること）\n${stylePrinciples}`;
@@ -322,6 +334,7 @@ JSONのみを出力してください。`;
   const directions: CreativeDirection[] = (parsed.directions || []).map(
     (d: Record<string, unknown>, i: number) => ({
       id: (d.id as string) || `dir-${i + 1}`,
+      typeId: (d.typeId as string) || (selectedTypes && selectedTypes[i]) || undefined,
       approach: (d.approach as string) || '',
       psychologicalAngle: (d.psychologicalAngle as string) || '',
       conceptSummary: (d.conceptSummary as string) || '',

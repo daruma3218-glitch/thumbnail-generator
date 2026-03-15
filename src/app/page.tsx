@@ -10,7 +10,7 @@ import { IterationHistory } from '@/components/IterationHistory';
 import { SessionHistory } from '@/components/SessionHistory';
 import { GeneratingLoader, DesigningLoader, ExtractingLoader, CopywritingLoader, RecommendingTypeLoader, ErrorBanner } from '@/components/LoadingStates';
 import { TypeSelector } from '@/components/TypeSelector';
-import { ThumbnailTypeId } from '@/lib/thumbnail-types';
+import { ThumbnailTypeId, THUMBNAIL_TYPES } from '@/lib/thumbnail-types';
 import { TypeRecommendation } from '@/lib/type-recommender';
 import { useGeneration } from '@/hooks/useGeneration';
 import { usePartsExtraction } from '@/hooks/usePartsExtraction';
@@ -116,10 +116,15 @@ function DirectionsPreview({
               key={d.id}
               className="bg-gray-800 border border-gray-700 rounded-xl p-4 hover:border-gray-500 transition-colors"
             >
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className="px-2 py-0.5 bg-green-900/50 text-green-300 rounded text-xs font-medium">
                   {isCreative(d) ? d.approach : d.refinementAxis}
                 </span>
+                {isCreative(d) && d.typeId && THUMBNAIL_TYPES[d.typeId as ThumbnailTypeId] && (
+                  <span className="px-2 py-0.5 bg-cyan-900/50 text-cyan-300 rounded text-xs font-medium">
+                    {d.typeId}: {THUMBNAIL_TYPES[d.typeId as ThumbnailTypeId].name}
+                  </span>
+                )}
               </div>
               <p className="text-sm text-white font-medium mb-2">
                 {d.conceptSummary}
@@ -195,9 +200,9 @@ export default function HomePage() {
   // Gemini model selection
   const [geminiModel, setGeminiModel] = useState<GeminiModel>('flash');
 
-  // 型選択
+  // 型選択（3型マルチ選択）
   const [typeRecommendation, setTypeRecommendation] = useState<TypeRecommendation | null>(null);
-  const [selectedType, setSelectedType] = useState<ThumbnailTypeId | null>(null);
+  const [selectedTypes, setSelectedTypes] = useState<ThumbnailTypeId[]>([]);
 
   // ⑤ Feedback history for iteration director
   const [feedbackHistory, setFeedbackHistory] = useState<string[]>([]);
@@ -233,12 +238,12 @@ export default function HomePage() {
         extractedParts: partsExtraction.extractedParts || null,
         referenceImages,
         iterations: updatedIterations,
-        selectedType: selectedType || undefined,
+        selectedTypes: selectedTypes.length > 0 ? selectedTypes : undefined,
       };
 
       sessionHistory.save(session);
     },
-    [title, script, originalConcept, referenceImages, partsExtraction.extractedParts, sessionHistory, selectedType],
+    [title, script, originalConcept, referenceImages, partsExtraction.extractedParts, sessionHistory, selectedTypes],
   );
 
   // Handle loading a session from history
@@ -260,7 +265,14 @@ export default function HomePage() {
       setCopywriterOutput(null);
       setFeedbackHistory([]);
       setTypeRecommendation(null);
-      setSelectedType((session.selectedType as ThumbnailTypeId) || null);
+      // 後方互換: 旧セッションは selectedType（単一）、新セッションは selectedTypes（配列）
+      if (session.selectedTypes && session.selectedTypes.length > 0) {
+        setSelectedTypes(session.selectedTypes as ThumbnailTypeId[]);
+      } else if (session.selectedType) {
+        setSelectedTypes([session.selectedType as ThumbnailTypeId]);
+      } else {
+        setSelectedTypes([]);
+      }
       sessionIdRef.current = session.id;
 
       if (session.iterations && session.iterations.length > 0) {
@@ -309,7 +321,7 @@ export default function HomePage() {
       setCopywriterOutput(null);
       setFeedbackHistory([]);
       setTypeRecommendation(null);
-      setSelectedType(null);
+      setSelectedTypes([]);
       generation.resetGeneration();
       partsExtraction.reset();
 
@@ -356,7 +368,7 @@ export default function HomePage() {
             'Content-Type': 'application/json',
             'x-anthropic-key': apiKeys.anthropicKey,
           },
-          body: JSON.stringify({ title, parts: partsExtraction.extractedParts, selectedType: selectedType || undefined }),
+          body: JSON.stringify({ title, parts: partsExtraction.extractedParts, selectedTypes: selectedTypes.length > 0 ? selectedTypes : undefined }),
         });
 
         if (copyResponse.ok) {
@@ -387,7 +399,7 @@ export default function HomePage() {
             hasReferenceImages: referenceImages.length > 0,
             copywriterOutput: copyOutput,
             imageUsageTypes: usageTypes,
-            selectedType: selectedType || undefined,
+            selectedTypes: selectedTypes.length > 0 ? selectedTypes : undefined,
           }),
         });
 
@@ -404,7 +416,7 @@ export default function HomePage() {
         setStep('confirming_parts');
       }
     },
-    [apiKeys, title, referenceImages, selectedType, partsExtraction.extractedParts],
+    [apiKeys, title, referenceImages, selectedTypes, partsExtraction.extractedParts],
   );
 
   // 型選択確定ハンドラ
@@ -436,7 +448,12 @@ export default function HomePage() {
         if (response.ok) {
           const recommendation: TypeRecommendation = await response.json();
           setTypeRecommendation(recommendation);
-          setSelectedType(recommendation.recommendedType);
+          // TOP3を自動選択
+          const top3 = [...recommendation.rankings]
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 3)
+            .map(r => r.typeId);
+          setSelectedTypes(top3);
           setStep('selecting_type');
         } else {
           // 型推薦失敗時はスキップしてコピーライティングへ
@@ -678,7 +695,19 @@ export default function HomePage() {
               imageUsageTypes: refUsageTypes,
               copywriterOutput: currentCopyOutput,
               previousFeedbacks: trimmedHistory.length > 0 ? trimmedHistory : undefined,
-              selectedType: selectedType || undefined,
+              // リファイン時は選択した方向性のtypeIdを渡す（単一型）
+              selectedType: (() => {
+                const currentIteration = iterations[iterations.length - 1];
+                if (currentIteration) {
+                  const matchingDir = currentIteration.directions.find(
+                    d => d.id === selectedThumbnail.promptVariation.id
+                  );
+                  if (matchingDir && 'typeId' in matchingDir) {
+                    return (matchingDir as CreativeDirection).typeId || undefined;
+                  }
+                }
+                return undefined;
+              })(),
             }),
           });
 
@@ -710,7 +739,7 @@ export default function HomePage() {
       setDesignError(friendlyMessage);
       setStep('selecting');
     },
-    [selectedThumbnail, originalConcept, apiKeys, feedbackHistory, copywriterOutput, referenceImages, iterations, generation, autoSaveSession, geminiModel, selectedType],
+    [selectedThumbnail, originalConcept, apiKeys, feedbackHistory, copywriterOutput, referenceImages, iterations, generation, autoSaveSession, geminiModel],
   );
 
   // Start over
@@ -729,7 +758,7 @@ export default function HomePage() {
     setCopywriterOutput(null);
     setFeedbackHistory([]);
     setTypeRecommendation(null);
-    setSelectedType(null);
+    setSelectedTypes([]);
     sessionIdRef.current = null;
     sessionHistory.setCurrentSessionId(null);
     generation.resetGeneration();
@@ -863,12 +892,22 @@ export default function HomePage() {
           <RecommendingTypeLoader />
         )}
 
-        {/* Step: Selecting type */}
-        {step === 'selecting_type' && typeRecommendation && selectedType && (
+        {/* Step: Selecting type (3型マルチ選択) */}
+        {step === 'selecting_type' && typeRecommendation && (
           <TypeSelector
             recommendation={typeRecommendation}
-            selectedType={selectedType}
-            onTypeSelect={setSelectedType}
+            selectedTypes={selectedTypes}
+            onTypeSelect={(typeId) => {
+              setSelectedTypes(prev => {
+                const index = prev.indexOf(typeId);
+                if (index !== -1) {
+                  return prev.filter(t => t !== typeId);
+                } else if (prev.length < 3) {
+                  return [...prev, typeId];
+                }
+                return prev;
+              });
+            }}
             onConfirm={handleTypeConfirmed}
             onBack={() => setStep('confirming_parts')}
           />

@@ -42,6 +42,7 @@ export interface ExtractedParts {
 // === Creative Directions Types ===
 export interface CreativeDirection {
   id: string;
+  typeId?: string; // ThumbnailTypeId — この方向性が従う型
   approach: string; // e.g. "感情訴求", "情報インパクト", "好奇心刺激"
   psychologicalAngle: string; // 心理的アプローチの詳細説明
   conceptSummary: string; // 日本語での方向性サマリー
@@ -142,7 +143,8 @@ export interface SavedSession {
   referenceImages: ReferenceImage[];
   iterations: IterationRound[];
   previewThumbnailDataUrl?: string;
-  selectedType?: string; // ThumbnailTypeId
+  selectedType?: string; // 後方互換（旧セッション用）
+  selectedTypes?: string[]; // ThumbnailTypeId[] — 選択された3型
 }
 
 export interface SessionListItem {
@@ -236,6 +238,7 @@ export interface RefineRequest {
     reasoning: string;
   };
   previousFeedbacks?: string[];
+  selectedType?: string; // リファイン時は単一型（その方向性のtypeId）
 }
 
 export interface GenerateRequest {

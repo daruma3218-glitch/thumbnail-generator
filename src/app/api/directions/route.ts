@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       reasoning: string;
     };
     imageUsageTypes?: string[];
+    selectedTypes?: string[];
     selectedType?: string;
   };
   try {
@@ -42,6 +43,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // selectedTypes優先、後方互換でselectedTypeもサポート
+    const selectedTypes = body.selectedTypes || (body.selectedType ? [body.selectedType] : undefined);
     const result = await designDirections(
       body.concept,
       anthropicKey,
@@ -49,7 +52,7 @@ export async function POST(request: NextRequest) {
       body.hasReferenceImages,
       body.copywriterOutput,
       body.imageUsageTypes as import('@/lib/types').ImageUsageType[] | undefined,
-      body.selectedType as import('@/lib/thumbnail-types').ThumbnailTypeId | undefined,
+      selectedTypes as import('@/lib/thumbnail-types').ThumbnailTypeId[] | undefined,
     );
     return new Response(JSON.stringify(result), {
       headers: { 'Content-Type': 'application/json' },

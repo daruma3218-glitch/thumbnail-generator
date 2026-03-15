@@ -61,18 +61,23 @@ export async function generateCopy(
   title: string,
   parts: ExtractedParts,
   anthropicKey: string,
-  selectedType?: ThumbnailTypeId,
+  selectedTypes?: ThumbnailTypeId[],
 ): Promise<CopywriterOutput> {
   const client = new Anthropic({ apiKey: anthropicKey });
 
   let systemPrompt = COPYWRITER_PROMPT;
-  if (selectedType) {
-    const typeSpec = THUMBNAIL_TYPES[selectedType];
-    systemPrompt += `\n\n## 選択されたサムネイル型: ${typeSpec.name}（コピーを型に合わせること）
+  if (selectedTypes && selectedTypes.length > 0) {
+    const typeInfos = selectedTypes.map((typeId, index) => {
+      const typeSpec = THUMBNAIL_TYPES[typeId];
+      return `### 型${index + 1}: ${typeSpec.name}（${typeId}）
 - テキスト階層: ${typeSpec.fontRules.hierarchy}
 - 構造: ${typeSpec.structure.sections.join(' → ')}
-- フォーカルポイント: ${typeSpec.structure.focalPoint}
-- この型に必要なコピーパターンを最優先で生成すること`;
+- フォーカルポイント: ${typeSpec.structure.focalPoint}`;
+    });
+    systemPrompt += `\n\n## 選択された${selectedTypes.length}つのサムネイル型（全型のコピーパターンをカバーすること）
+${typeInfos.join('\n\n')}
+- メインコピー3パターンは、それぞれ異なる型に最適化されたものを含めること
+- 各型で効果的なコピーパターンを考慮すること`;
   }
 
   const userMessage = `以下の動画分析データを元に、サムネイル用のキャッチコピーを設計してください。

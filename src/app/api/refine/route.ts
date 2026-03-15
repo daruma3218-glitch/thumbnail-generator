@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         hasReferenceImages: body.hasReferenceImages || false,
         imageUsageTypes: body.imageUsageTypes,
         previousFeedbacks: body.previousFeedbacks,
-        selectedType: (body as unknown as Record<string, unknown>).selectedType as ThumbnailTypeId | undefined,
+        selectedType: body.selectedType as ThumbnailTypeId | undefined,
       },
       anthropicKey,
     );
